@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Polymarket Analytics — LP Rewards Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:           #06070e;
+      --surface:      #0b0c18;
+      --card:         rgba(255,255,255,0.032);
+      --card-hov:     rgba(255,255,255,0.055);
+      --border:       rgba(255,255,255,0.07);
+      --border-hov:   rgba(255,255,255,0.15);
+      --text-1:       #e2e8f0;
+      --text-2:       #8b96a8;
+      --text-3:       #414d5e;
+      --indigo:       #6366f1;
+      --violet:       #8b5cf6;
+      --sky:          #38bdf8;
+      --gold:         #f59e0b;
+      --emerald:      #10b981;
+      --rose:         #f43f5e;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text-1);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Background layers ── */
+    .bg-layer {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 90% 55% at 50% -5%,  rgba(99,102,241,.13)  0%, transparent 68%),
+        radial-gradient(ellipse 55% 40% at 85% 108%, rgba(56,189,248,.07)  0%, transparent 60%),
+        radial-gradient(ellipse 40% 35% at 10% 95%,  rgba(139,92,246,.05) 0%, transparent 55%);
+    }
+
+    /* Subtle grid */
+    .bg-grid {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 30%, transparent 80%);
+    }
+
+    header, main, footer { position: relative; z-index: 1; }
+
+    /* ── Glass / card system ── */
+    .glass {
+      background: var(--card);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .p-card {
+      background: linear-gradient(140deg, rgba(255,255,255,.042) 0%, rgba(255,255,255,.018) 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .22s ease, box-shadow .22s ease, transform .18s ease;
+    }
+    .p-card::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(140deg, rgba(255,255,255,.04) 0%, transparent 55%);
+      pointer-events: none;
+      border-radius: inherit;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(99,102,241,.28);
+      box-shadow: 0 0 24px rgba(99,102,241,.09), 0 8px 32px rgba(0,0,0,.28);
+      transform: translateY(-2px);
+    }
+
+    /* ── Typography ── */
+    .gradient-text {
+      background: linear-gradient(130deg, #a5b4fc 0%, #818cf8 35%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .section-title {
+      font-size: .625rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: .75rem;
+    }
+
+    .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+
+    .stat-val {
+      font-weight: 700;
+      font-size: clamp(.95rem, 4vw, 1.35rem);
+      line-height: 1.1;
+      letter-spacing: -.01em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Input ── */
+    .p-input {
+      background: rgba(255,255,255,.028);
+      border: 1px solid rgba(255,255,255,.1);
+      color: var(--text-1);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85rem;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .p-input::placeholder { color: var(--text-3); }
+    .p-input:focus {
+      outline: none;
+      border-color: rgba(99,102,241,.6);
+      box-shadow: 0 0 0 4px rgba(99,102,241,.1), 0 0 22px rgba(99,102,241,.08);
+      background: rgba(99,102,241,.035);
+    }
+
+    /* input-glow is an alias used in JS-generated content, map to same styles */
+    .input-glow:focus { outline: none; border-color: rgba(99,102,241,.6); box-shadow: 0 0 0 4px rgba(99,102,241,.1); }
+
+    /* ── Button ── */
+    .p-btn {
+      background: linear-gradient(135deg, #6366f1, #7c3aed);
+      border: 1px solid rgba(139,92,246,.35);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: -.01em;
+      box-shadow: 0 4px 18px rgba(99,102,241,.28);
+      transition: opacity .2s, transform .16s, box-shadow .2s;
+    }
+    .p-btn:hover:not(:disabled) {
+      opacity: .9;
+      box-shadow: 0 6px 28px rgba(99,102,241,.45);
+      transform: translateY(-1px);
+    }
+    .p-btn:active:not(:disabled) { transform: scale(.97); }
+    .p-btn:disabled { opacity: .38; cursor: not-allowed; }
+
+    /* ── Chip (recent wallets — rendered by JS) ── */
+    .chip {
+      transition: background .15s, border-color .15s, color .15s;
+      cursor: pointer;
+    }
+    .chip:hover {
+      background: rgba(99,102,241,.12) !important;
+      border-color: rgba(99,102,241,.4) !important;
+      color: #a5b4fc !important;
+    }
+
+    /* ── Tag live ── */
+    .tag-live {
+      background: rgba(16,185,129,.14);
+      color: #34d399;
+      border: 1px solid rgba(16,185,129,.28);
+      font-size: .58rem;
+      padding: 1px 6px;
+      border-radius: 99px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    /* ── Table ── */
+    .divider { border-color: var(--border); }
+    .tr-hover:hover { background: rgba(99,102,241,.04); }
+    .td-cell { padding: .6rem .9rem; }
+    @media(min-width:640px) { .td-cell { padding: .9rem 1.25rem; } }
+
+    /* ── Charts ── */
+    .chart-h { height: 165px; }
+    @media(min-width:640px)  { .chart-h { height: 200px; } }
+    @media(min-width:1024px) { .chart-h { height: 240px; } }
+
+    /* ── Animations ── */
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fade-in .45s cubic-bezier(.16,1,.3,1) both; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin .9s linear infinite; }
+
+    @keyframes badge-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,.3); }
+      50%      { box-shadow: 0 0 0 5px rgba(99,102,241,.0); }
+    }
+    .badge-pulse { animation: badge-pulse 2.4s ease infinite; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.18); }
+
+    /* ── Responsive ── */
+
+    /* ── Leaderboard card border ── */
+    .lb-card { border-color: rgba(245,158,11,.16); }
+    .lb-card:hover { border-color: rgba(245,158,11,.3); }
+
+    /* ── Mobile: prevent iOS auto-zoom on inputs (font-size must be ≥16px) ── */
+    @media(max-width:767px) {
+      .p-input { font-size: 16px; }
+    }
+
+    /* ── Touch targets: prevent double-tap delay ── */
+    .p-btn, .chip, button, a { touch-action: manipulation; }
+  </style>
+</head>
+<body>
+
+<!-- background decoration layers -->
+<div class="bg-layer" aria-hidden="true"></div>
+<div class="bg-grid"  aria-hidden="true"></div>
+
+<!-- ═══ HEADER ═══ -->
+<header style="background:rgba(6,7,14,.88);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-bottom:1px solid rgba(255,255,255,.065)"
+        class="sticky top-0 z-20 px-4 sm:px-6">
+  <div class="max-w-6xl mx-auto flex items-center justify-between h-14 sm:h-16 gap-3">
+
+    <!-- Brand -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:linear-gradient(135deg,#6366f1,#8b5cf6,#38bdf8);box-shadow:0 4px 16px rgba(99,102,241,.42)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <h1 class="font-bold text-sm sm:text-base leading-tight tracking-tight text-white truncate">
+          Polymarket Analytics
+        </h1>
+        <p class="text-xs hidden sm:block" style="color:var(--text-3)">
+          LP Rewards · Wallet History · Trading Stats
+        </p>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <a href="https://polymarket.com/leaderboard" target="_blank"
+       class="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-xl transition-all"
+       style="color:var(--text-3);border:1px solid var(--border)"
+       onmouseover="this.style.color='var(--text-1)';this.style.borderColor='var(--border-hov)'"
+       onmouseout="this.style.color='var(--text-3)';this.style.borderColor='var(--border)'">
+      Leaderboard
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+        <path d="M2.5 2.5h7m0 0v7m0-7L2.5 9.5" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+
+  </div>
+</header>
+
+<!-- ═══ MAIN ═══ -->
+<main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+
+  <!-- ── Hero ── -->
+  <div class="text-center mb-10 sm:mb-14">
+    <div class="inline-flex items-center gap-2 mb-4 sm:mb-5 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-widest badge-pulse"
+         style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);color:#a5b4fc">
+      <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+      FULL WALLET DASHBOARD
+    </div>
+    <h2 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-4 tracking-tight" style="line-height:1.08">
+      <span class="gradient-text">LP Rewards</span>
+      <span class="text-white"> &amp; Wallet Analytics</span>
+    </h2>
+    <p class="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style="color:var(--text-2)">
+      Paste any wallet address to see LP rewards by epoch, P&amp;L,
+      trading stats, and full wallet history.
+    </p>
+  </div>
+
+  <!-- ── Search ── -->
+  <div class="max-w-2xl mx-auto mb-10 sm:mb-14">
+    <div class="flex gap-2.5">
+      <input id="walletInput" type="text" placeholder="Enter wallet address (0x…)"
+        class="flex-1 px-4 py-3.5 rounded-2xl p-input transition-all min-w-0"
+        autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" />
+      <button id="fetchBtn" onclick="handleFetch()"
+        class="px-4 sm:px-6 py-3.5 rounded-2xl p-btn text-sm flex-shrink-0 flex items-center gap-2">
+        <!-- mobile icon -->
+        <svg class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <span class="hidden sm:inline">Analyze Wallet</span>
+        <svg class="hidden sm:block w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+        </svg>
+      </button>
+    </div>
+    <p class="text-center text-xs mt-3" style="color:var(--text-3)">
+      Supports EOA &amp; proxy wallets · Powered by Polymarket Data API
+    </p>
+
+    <!-- Recent Searches -->
+    <div id="recentWallets" class="hidden mt-4">
+      <p class="text-xs text-center mb-2.5" style="color:var(--text-3)">Recent searches</p>
+      <div id="recentChips" class="flex flex-wrap justify-center gap-2"></div>
+    </div>
+  </div>
+
+  <!-- ── LOADING ── -->
+  <div id="loadingState" class="hidden text-center py-24 sm:py-32">
+    <div class="relative w-12 h-12 mx-auto mb-6">
+      <svg class="spinner w-12 h-12" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,.06)" stroke-width="3"/>
+        <path d="M24 4a20 20 0 0120 20" stroke="url(#sg)" stroke-width="3" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="sg" x1="24" y1="4" x2="44" y2="24" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#6366f1"/>
+            <stop offset="100%" stop-color="#38bdf8"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <p id="loadingMsg" class="font-semibold mb-2 text-white">Fetching wallet data…</p>
+    <p id="loadingDetail" class="text-xs px-4 mono" style="color:var(--text-3)"></p>
+  </div>
+
+  <!-- ── ERROR ── -->
+  <div id="errorState" class="hidden max-w-sm mx-auto">
+    <div class="p-card text-center" style="padding:2rem 1.75rem">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+           style="background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.2)">
+        <svg class="w-6 h-6" style="color:#f43f5e" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h3 class="font-semibold text-white mb-2">Something went wrong</h3>
+      <p id="errorMsg" class="text-sm leading-relaxed" style="color:var(--text-2)"></p>
+    </div>
+  </div>
+
+  <!-- ── EMPTY ── -->
+  <div id="emptyState" class="hidden max-w-sm mx-auto">
+    <div class="p-card text-center" style="padding:2.5rem 1.75rem">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+           style="background:rgba(255,255,255,.05);border:1px solid var(--border)">
+        <svg class="w-6 h-6" style="color:var(--text-3)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <h3 class="font-semibold text-white mb-2">No activity found</h3>
+      <p class="text-sm leading-relaxed" style="color:var(--text-2)">
+        This address has no recorded activity on Polymarket yet.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ RESULTS ═══ -->
+  <div id="results" class="hidden fade-in space-y-5 sm:space-y-6">
+
+    <!-- ── Wallet Profile Row ── -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div id="avatar"
+             class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-xs font-bold tracking-wider flex-shrink-0"
+             style="background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 16px rgba(99,102,241,.32)">
+        </div>
+        <div class="min-w-0">
+          <p class="mono font-semibold text-sm text-white truncate" id="addrDisplay"></p>
+          <p class="text-xs mt-0.5 truncate" style="color:var(--text-3)">
+            <span id="profileName" class="hidden mr-1.5" style="color:var(--text-2)"></span>
+            Active since <span id="activeSinceDisplay" style="color:var(--text-2)"></span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2.5 flex-shrink-0">
+        <a id="polygonscanLink" href="#" target="_blank"
+           class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all"
+           style="color:var(--text-3);border:1px solid var(--border)"
+           onmouseover="this.style.color='var(--text-1)';this.style.borderColor='var(--border-hov)'"
+           onmouseout="this.style.color='var(--text-3)';this.style.borderColor='var(--border)'">
+          Polygonscan
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 2.5h7m0 0v7m0-7L2.5 9.5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <span class="text-xs hidden sm:block" style="color:var(--text-3)">
+          Updated <span id="updatedAt" style="color:var(--text-2)"></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ── Leaderboard Rankings ── -->
+    <div class="p-card lb-card overflow-hidden">
+
+      <!-- Mobile / small-tablet -->
+      <div class="md:hidden p-3">
+        <div class="flex items-center gap-2.5 mb-2.5">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+               style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2)">
+            <span class="text-lg">🏅</span>
+          </div>
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest" style="color:var(--text-3)">Leaderboard</p>
+            <p class="text-xs mt-0.5" style="color:var(--text-3)">All-time rankings</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="text-center rounded-xl p-2" style="background:rgba(255,255,255,.03)">
+            <p class="text-xs mb-1" style="color:var(--text-3)">Vol Rank</p>
+            <p class="text-sm font-bold mono leading-none" id="leaderboardRank">—</p>
+            <p class="text-xs mt-1 font-semibold" id="leaderboardVolPct"></p>
+          </div>
+          <div class="text-center rounded-xl p-2" style="background:rgba(255,255,255,.03)">
+            <p class="text-xs mb-1" style="color:var(--text-3)">PnL Rank</p>
+            <p class="text-sm font-bold mono leading-none" id="leaderboardPnlRank">—</p>
+          </div>
+          <div class="text-center rounded-xl p-2" style="background:rgba(255,255,255,.03)">
+            <p class="text-xs mb-1" style="color:var(--text-3)">Volume</p>
+            <p class="text-xs font-bold leading-none mt-1 text-white" id="leaderboardVolume">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tablet / Desktop -->
+      <div class="hidden md:flex items-center justify-between gap-4 lg:gap-6 px-4 lg:px-6 py-4 lg:py-5">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+               style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)">
+            <span class="text-2xl">🏅</span>
+          </div>
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color:var(--text-3);letter-spacing:.1em">
+              Leaderboard Rankings
+            </p>
+            <p class="text-xs hidden lg:block" style="color:var(--text-3)">
+              All-time · All categories · Across all Polymarket traders
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 lg:gap-7">
+          <div class="text-center">
+            <p class="text-xs mb-1.5" style="color:var(--text-3)">Volume Rank</p>
+            <p class="text-xl lg:text-2xl font-bold mono" id="leaderboardRankD">—</p>
+            <p class="text-xs mt-1.5 font-semibold" id="leaderboardVolPctD"></p>
+          </div>
+          <div class="w-px h-10 lg:h-12" style="background:var(--border)"></div>
+          <div class="text-center">
+            <p class="text-xs mb-1.5" style="color:var(--text-3)">P&amp;L Rank</p>
+            <p class="text-xl lg:text-2xl font-bold mono" id="leaderboardPnlRankD">—</p>
+          </div>
+          <div class="w-px h-10 lg:h-12" style="background:var(--border)"></div>
+          <div class="text-center">
+            <p class="text-xs mb-1.5" style="color:var(--text-3)">Total Volume</p>
+            <p class="text-base lg:text-xl font-bold text-white" id="leaderboardVolumeD">—</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 1: TRADING OVERVIEW ── -->
+    <div>
+      <p class="section-title">Trading Overview</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Position Value</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">💼</div>
+          </div>
+          <p class="stat-val" id="statPositionValue">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">Current holdings</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Est. P&amp;L</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">📊</div>
+          </div>
+          <p class="stat-val" id="statPnl">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)" id="statPnlNote">Realized + unrealized</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Volume Traded</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">💱</div>
+          </div>
+          <p class="stat-val" id="statVolume">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">Total USDC</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Markets Traded</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">🏪</div>
+          </div>
+          <p class="stat-val text-sky-400" id="statMarkets">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">Unique markets</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Win Rate</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">🎯</div>
+          </div>
+          <p class="stat-val" id="statWinRate">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)" id="statWinRateNote">Closed positions</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Avg Trade Size</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">📐</div>
+          </div>
+          <p class="stat-val text-violet-400" id="statAvgTrade">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">USDC per trade</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: WALLET HISTORY ── -->
+    <div>
+      <p class="section-title">Wallet History</p>
+      <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Active Since</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">📅</div>
+          </div>
+          <p class="font-bold text-base leading-tight text-white" id="statActiveSince">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-2)" id="statActiveAge"></p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Active Days</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">⚡</div>
+          </div>
+          <p class="stat-val text-violet-400" id="statActiveDays">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">Days with activity</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: WEEKLY VOLUME CHART ── -->
+    <div class="p-card" style="padding:1.25rem 1.4rem">
+      <div class="flex items-start sm:items-center justify-between mb-4 sm:mb-5 gap-2">
+        <div>
+          <p class="section-title mb-1">Weekly Trading Volume</p>
+          <p class="text-xs" style="color:var(--text-3)" id="weeklyVolLabel"></p>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs flex-shrink-0" style="color:var(--text-3)">
+          <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#8b5cf6"></span>
+          <span class="hidden sm:inline">Volume per week</span>
+          <span class="sm:hidden">Vol/wk</span>
+        </div>
+      </div>
+      <div id="weeklyVolWrap" class="chart-h">
+        <canvas id="weeklyVolChart"></canvas>
+      </div>
+      <p id="noWeeklyVolMsg" class="hidden text-center text-sm py-8" style="color:var(--text-3)">
+        No trading activity found for this address.
+      </p>
+    </div>
+
+    <!-- ── SECTION 4: LP REWARDS STATS ── -->
+    <div>
+      <p class="section-title">Liquidity Providing Rewards</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Liquidity Rewards</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">🏆</div>
+          </div>
+          <p class="stat-val" id="statLpRewards">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">USDC</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Maker Rebates</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">🔄</div>
+          </div>
+          <p class="stat-val" id="statRebates">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">USDC</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Total LP Earned</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">💰</div>
+          </div>
+          <p class="stat-val text-emerald-400" id="statLpTotal">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">USDC</p>
+        </div>
+
+        <div class="p-card stat-card p-3.5 sm:p-5">
+          <div class="flex items-start justify-between mb-3 sm:mb-3.5">
+            <p class="text-xs font-medium" style="color:var(--text-3)">Epochs Active</p>
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+                 style="background:rgba(255,255,255,.06)">📆</div>
+          </div>
+          <p class="stat-val text-sky-400" id="statEpochs">—</p>
+          <p class="text-xs mt-1.5" style="color:var(--text-3)">Reward weeks</p>
+        </div>
+
+      </div>
+
+      <!-- LP Tier Banner -->
+      <div id="lpTierBanner" class="hidden mt-3 p-card" style="padding:1.25rem 1.4rem">
+        <div class="flex items-center gap-3 mb-4">
+          <div id="lpTierIcon" class="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <span id="lpTierEmoji" class="text-2xl"></span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color:var(--text-3)">LP Tier Ranking</p>
+            <p class="font-bold text-base leading-tight" id="lpTierLabel">—</p>
+            <p class="text-xs mt-1 leading-relaxed" style="color:var(--text-2)" id="lpTierDesc">—</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-xs mb-1" style="color:var(--text-3)">Total Earned</p>
+            <p class="font-bold text-emerald-400 stat-val" id="lpTierTotal">—</p>
+          </div>
+        </div>
+
+        <!-- Progress to next tier -->
+        <div id="lpTierProgressWrap">
+          <div class="flex justify-between items-center text-xs mb-2">
+            <span style="color:var(--text-3)" id="lpTierProgressLabel">Progress to next tier</span>
+            <span class="font-bold text-white mono" id="lpTierProgressPct"></span>
+          </div>
+          <div class="w-full h-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,.06)">
+            <div id="lpTierProgressBar" class="h-full rounded-full transition-all duration-700" style="width:0%"></div>
+          </div>
+          <div class="flex justify-between text-xs mt-2" style="color:var(--text-3)">
+            <span id="lpTierProgressEarned"></span>
+            <span id="lpTierProgressTarget" class="text-right"></span>
+          </div>
+        </div>
+
+        <!-- Elite message -->
+        <div id="lpTierElite" class="hidden text-center py-1">
+          <p class="text-xs" style="color:var(--text-2)">
+            🎉 Elite tier — You're in the
+            <span class="text-yellow-400 font-semibold">Top 1%</span>
+            of all Polymarket liquidity providers!
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 5: LP REWARDS CHART ── -->
+    <div class="p-card" style="padding:1.25rem 1.4rem">
+      <div class="flex items-start sm:items-center justify-between mb-4 sm:mb-5 gap-2">
+        <div>
+          <p class="section-title mb-1">LP Rewards Per Epoch</p>
+          <p class="text-xs" style="color:var(--text-3)" id="epochRangeLabel"></p>
+        </div>
+        <div class="flex items-center gap-3 text-xs flex-shrink-0" style="color:var(--text-3)">
+          <span class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#38bdf8"></span>Liq.
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#6366f1"></span>Reb.
+          </span>
+        </div>
+      </div>
+      <div id="chartWrap" class="chart-h">
+        <canvas id="chart"></canvas>
+      </div>
+      <p id="noRewardsMsg" class="hidden text-center text-sm py-8" style="color:var(--text-3)">
+        No LP rewards or maker rebates found for this address.
+      </p>
+    </div>
+
+    <!-- ── SECTION 6: EPOCH TABLE ── -->
+    <div id="epochSection" class="p-card overflow-hidden">
+      <div class="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4"
+           style="border-bottom:1px solid var(--border)">
+        <h3 class="text-sm font-semibold text-white">Epoch Breakdown</h3>
+        <span class="text-xs mono" style="color:var(--text-3)" id="epochCount"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs sm:text-sm" style="min-width:520px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th class="text-left td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Epoch</th>
+              <th class="text-left td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Date Range</th>
+              <th class="text-right td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Liquidity</th>
+              <th class="text-right td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Rebates</th>
+              <th class="text-right td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Total</th>
+              <th class="text-right td-cell text-xs font-semibold uppercase tracking-wider"
+                  style="color:var(--text-3);letter-spacing:.08em">Txns</th>
+            </tr>
+          </thead>
+          <tbody id="epochTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+</main>
+
+<footer class="text-center pb-10 sm:pb-14 px-4 mt-2">
+  <p class="text-xs" style="color:var(--text-3)">
+    Powered by
+    <a href="https://docs.polymarket.com" target="_blank"
+       style="color:var(--text-2);text-decoration:none"
+       onmouseover="this.style.color='var(--text-1)'"
+       onmouseout="this.style.color='var(--text-2)'">Polymarket Data API</a>
+    &nbsp;·&nbsp; P&amp;L is an estimate based on available on-chain data
+  </p>
+</footer>
+
+<!-- ═══ SCRIPT ═══ -->
+<script>
+const DATA_API = 'https://data-api.polymarket.com';
+let chartObj = null;
+let weeklyVolChartObj = null;
+
+/* ─── helpers ─── */
+const $ = id => document.getElementById(id);
+const sum = (arr, f) => arr.reduce((s, x) => s + (parseFloat(x[f]) || 0), 0);
+const fmtUSDC = v => v === 0 ? '$0.00' : v < 0.01 && v > 0 ? '<$0.01'
+  : '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtDate   = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+const fmtShort  = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+const fmtShortYear = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+const shortAddr = a => `${a.slice(0,6)}…${a.slice(-4)}`;
+const isAddr    = a => /^0x[0-9a-fA-F]{40}$/.test(a.trim());
+const isMobile  = () => window.innerWidth < 640;
+
+function timeAgo(date) {
+  const ms = Date.now() - date.getTime();
+  const y  = Math.floor(ms / (365.25*864e5));
+  const m  = Math.floor((ms % (365.25*864e5)) / (30.44*864e5));
+  const d  = Math.floor(ms / 864e5);
+  if (y > 0) return `${y}yr ${m>0?m+'mo':''} ago`;
+  if (m > 0) return `${m} month${m>1?'s':''} ago`;
+  return `${d} day${d>1?'s':''} ago`;
+}
+
+/* ─── Recent wallets ─── */
+function loadRecentWallets() {
+  try { return JSON.parse(localStorage.getItem('pm_recent_wallets') || '[]'); }
+  catch { return []; }
+}
+function saveRecentWallet(address) {
+  const list = loadRecentWallets().filter(a => a.toLowerCase() !== address.toLowerCase());
+  list.unshift(address);
+  localStorage.setItem('pm_recent_wallets', JSON.stringify(list.slice(0, 5)));
+  renderRecentWallets();
+}
+function renderRecentWallets() {
+  const list = loadRecentWallets();
+  const wrap = $('recentWallets');
+  if (!list.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  $('recentChips').innerHTML = list.map(addr => `
+    <button onclick="selectRecent('${addr}')"
+      class="chip mono text-xs px-3 py-1.5 rounded-lg glass text-gray-500 border border-white/8">
+      ${addr.slice(0,6)}…${addr.slice(-4)}
+    </button>`).join('');
+}
+function selectRecent(addr) { $('walletInput').value = addr; handleFetch(); }
+
+/* ─── API fetchers ─── */
+async function fetchAll(address, type) {
+  let all = [], offset = 0, limit = 500;
+  while (true) {
+    const url = `${DATA_API}/activity?user=${encodeURIComponent(address)}&type=${type}&limit=${limit}&offset=${offset}&sortBy=TIMESTAMP&sortDirection=ASC`;
+    const res = await fetch(url);
+    if (!res.ok) { if (!all.length) return []; break; }
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) break;
+    all = all.concat(data);
+    if (data.length < limit || offset + limit > 10000) break;
+    offset += limit;
+  }
+  return all;
+}
+async function fetchValue(address) {
+  try {
+    const res  = await fetch(`${DATA_API}/value?user=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    return Array.isArray(data) && data[0] ? parseFloat(data[0].value) || 0 : 0;
+  } catch { return 0; }
+}
+async function fetchPositions(address) {
+  try {
+    let all = [], offset = 0;
+    while (true) {
+      const res  = await fetch(`${DATA_API}/positions?user=${encodeURIComponent(address)}&limit=500&offset=${offset}`);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) break;
+      all = all.concat(data);
+      if (data.length < 500) break;
+      offset += 500;
+    }
+    return all;
+  } catch { return []; }
+}
+async function fetchLeaderboardRank(address) {
+  const toJSON = r => r.ok ? r.json().catch(()=>[]) : Promise.resolve([]);
+  try {
+    const [vr, pr, p500k] = await Promise.all([
+      fetch(`${DATA_API}/v1/leaderboard?user=${encodeURIComponent(address)}&timePeriod=ALL&orderBy=VOL&limit=1`).then(toJSON),
+      fetch(`${DATA_API}/v1/leaderboard?user=${encodeURIComponent(address)}&timePeriod=ALL&orderBy=PNL&limit=1`).then(toJSON),
+      fetch(`${DATA_API}/v1/leaderboard?timePeriod=ALL&orderBy=VOL&limit=1&offset=500000`).then(toJSON).catch(()=>[]),
+    ]);
+    let volRank = null, pnlRank = null;
+    const totalTraders = (Array.isArray(p500k) && p500k.length) ? 500000 : 100000;
+    if (Array.isArray(vr) && vr.length) volRank = parseInt(vr[0].rank);
+    if (Array.isArray(pr) && pr.length) pnlRank = parseInt(pr[0].rank);
+    return { volRank, pnlRank, totalTraders };
+  } catch { return { volRank:null, pnlRank:null, totalTraders:100000 }; }
+}
+
+/* ─── Grouping ─── */
+function weekStart(ts) {
+  const d = new Date(ts * 1000);
+  d.setUTCHours(0,0,0,0);
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  return d;
+}
+function groupEpochs(rewards, rebates) {
+  const map = {};
+  const add = (items, key) => items.forEach(a => {
+    const ws = weekStart(a.timestamp), k = ws.toISOString();
+    if (!map[k]) { const we = new Date(ws); we.setUTCDate(we.getUTCDate()+6); map[k]={startDate:ws,endDate:we,rewards:0,rebates:0,total:0,txns:0}; }
+    const amt = parseFloat(a.usdcSize)||0;
+    map[k][key]+=amt; map[k].total+=amt; map[k].txns++;
+  });
+  add(rewards,'rewards'); add(rebates,'rebates');
+  const sorted = Object.values(map).sort((a,b)=>a.startDate-b.startDate);
+  sorted.forEach((e,i)=>{e.epochNum=i+1;});
+  return sorted;
+}
+function groupWeeklyVolume(trades) {
+  const map = {};
+  trades.forEach(t => {
+    const ws = weekStart(t.timestamp), k = ws.toISOString();
+    if (!map[k]) map[k]={startDate:ws,vol:0,count:0};
+    map[k].vol   += parseFloat(t.usdcSize)||0;
+    map[k].count += 1;
+  });
+  return Object.values(map).sort((a,b)=>a.startDate-b.startDate);
+}
+
+/* ─── State ─── */
+const STATES = ['loadingState','errorState','emptyState','results'];
+function showState(id) { STATES.forEach(s=>$(s).classList.add('hidden')); if(id)$(id).classList.remove('hidden'); }
+
+/* ─── Rank colour ─── */
+function rankClass(n) {
+  if (n <= 10)  return 'text-yellow-400';
+  if (n <= 100) return 'text-sky-400';
+  return 'text-gray-300';
+}
+function fmtTopPct(pct) {
+  if (pct <= 0.01) return 'Top 0.01%';
+  if (pct <  0.1)  return `Top ${pct.toFixed(2)}%`;
+  if (pct <  1)    return `Top ${pct.toFixed(1)}%`;
+  if (pct <  10)   return `Top ${pct.toFixed(1)}%`;
+  return `Top ${Math.round(pct)}%`;
+}
+function pctClass(pct) {
+  if (pct <= 1)  return 'text-yellow-400';
+  if (pct <= 5)  return 'text-sky-400';
+  if (pct <= 15) return 'text-gray-300';
+  return 'text-gray-500';
+}
+
+/* ─── Set rank on both mobile & desktop elements ─── */
+function setRank(mobileId, desktopId, rank) {
+  const txt = rank ? '#'+rank.toLocaleString() : 'Unranked';
+  const cls = 'font-bold mono ' + (rank ? rankClass(rank) : 'text-gray-600');
+  const m = $(mobileId), d = $(desktopId);
+  m.textContent = txt; m.className = 'text-sm leading-none ' + cls;
+  d.textContent = txt; d.className = 'text-xl lg:text-2xl ' + cls;
+}
+
+/* ─── LP Tier Ranking ─── */
+const LP_TIERS = [
+  { name:'Top 1%',        emoji:'🏆', min:1563, nextMin:null, nextLabel:null,
+    color:'text-yellow-400', bg:'bg-yellow-500/15', bar:'from-yellow-500 to-amber-400',
+    desc:'Elite — Top 1% of all Polymarket liquidity providers' },
+  { name:'Top 1,000 LPs', emoji:'🥇', min: 927, nextMin:1563, nextLabel:'Top 1%',
+    color:'text-amber-400',  bg:'bg-amber-500/15',  bar:'from-amber-500 to-yellow-400',
+    desc:'Top 1,000 LP earners across all of Polymarket' },
+  { name:'Top 10%',       emoji:'🥈', min:  49, nextMin: 927, nextLabel:'Top 1,000 LPs',
+    color:'text-sky-400',    bg:'bg-sky-500/15',    bar:'from-sky-500 to-indigo-400',
+    desc:'Top 10% of all Polymarket liquidity providers' },
+  { name:'Active LP',     emoji:'🥉', min:   0, nextMin:  49, nextLabel:'Top 10%',
+    color:'text-gray-300',   bg:'bg-white/8',       bar:'from-indigo-500 to-sky-400',
+    desc:'Earning LP rewards — keep going to reach the top 10%!' },
+];
+function updateLpTier(totalEarned) {
+  const banner = $('lpTierBanner');
+  if (totalEarned <= 0) { banner.classList.add('hidden'); return; }
+  banner.classList.remove('hidden');
+  const tier = LP_TIERS.find(t => totalEarned >= t.min);
+  if (!tier) return;
+
+  $('lpTierEmoji').textContent = tier.emoji;
+  $('lpTierIcon').className    = `w-10 h-10 sm:w-11 sm:h-11 rounded-xl ${tier.bg} flex items-center justify-center flex-shrink-0`;
+  $('lpTierLabel').textContent = tier.name;
+  $('lpTierLabel').className   = `font-bold text-sm sm:text-base ${tier.color}`;
+  $('lpTierDesc').textContent  = tier.desc;
+  $('lpTierTotal').textContent = fmtUSDC(totalEarned);
+
+  const progressWrap = $('lpTierProgressWrap');
+  const eliteDiv     = $('lpTierElite');
+  if (tier.nextMin !== null) {
+    progressWrap.classList.remove('hidden');
+    eliteDiv.classList.add('hidden');
+    const range  = tier.nextMin - tier.min;
+    const filled = totalEarned  - tier.min;
+    const pct    = Math.min(100, (filled / range) * 100);
+    const needed = Math.max(0, tier.nextMin - totalEarned);
+    $('lpTierProgressLabel').textContent  = `Progress to ${tier.nextLabel}`;
+    $('lpTierProgressPct').textContent    = `${pct.toFixed(1)}%`;
+    $('lpTierProgressBar').style.width    = `${pct}%`;
+    $('lpTierProgressBar').className      = `h-full rounded-full transition-all duration-700 bg-gradient-to-r ${tier.bar}`;
+    $('lpTierProgressEarned').textContent = `${fmtUSDC(totalEarned)} earned`;
+    $('lpTierProgressTarget').textContent = `${fmtUSDC(needed)} more to unlock`;
+  } else {
+    progressWrap.classList.add('hidden');
+    eliteDiv.classList.remove('hidden');
+  }
+}
+
+/* ─── Chart options shared ─── */
+function chartOpts(tooltipCb) {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:'#0d0e1c',
+        borderColor:'rgba(255,255,255,.1)',
+        borderWidth:1,
+        padding: isMobile() ? 10 : 13,
+        cornerRadius: 10,
+        titleFont:{ family:"'Inter',sans-serif", size:11, weight:'600' },
+        bodyFont:{ family:"'JetBrains Mono',monospace", size:11 },
+        callbacks: tooltipCb
+      }
+    },
+    scales:{
+      x:{
+        grid:{ color:'rgba(255,255,255,.04)', drawBorder:false },
+        ticks:{ color:'#414d5e', font:{ size:9, family:"'Inter',sans-serif" }, maxTicksLimit: isMobile()?8:20 }
+      },
+      y:{
+        grid:{ color:'rgba(255,255,255,.04)', drawBorder:false },
+        ticks:{ color:'#414d5e', font:{ size:9, family:"'Inter',sans-serif" }, callback:v=>'$'+v.toLocaleString() }
+      }
+    }
+  };
+}
+
+/* ─── LP Rewards chart ─── */
+function renderChart(epochs) {
+  if (chartObj) chartObj.destroy();
+  if (!epochs.length) { $('chartWrap').classList.add('hidden'); $('noRewardsMsg').classList.remove('hidden'); return; }
+  $('chartWrap').classList.remove('hidden'); $('noRewardsMsg').classList.add('hidden');
+  chartObj = new Chart($('chart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: epochs.map(e=>`Ep.${e.epochNum}`),
+      datasets:[
+        { label:'Liquidity', data:epochs.map(e=>+e.rewards.toFixed(4)),
+          backgroundColor:'rgba(56,189,248,.7)', borderColor:'rgba(56,189,248,1)', borderWidth:1, borderRadius:4 },
+        { label:'Rebates',   data:epochs.map(e=>+e.rebates.toFixed(4)),
+          backgroundColor:'rgba(99,102,241,.7)', borderColor:'rgba(99,102,241,1)', borderWidth:1, borderRadius:4 }
+      ]
+    },
+    options: chartOpts({
+      title: items => { const e=epochs[items[0].dataIndex]; return `Epoch ${e.epochNum} (${fmtShort(e.startDate)}–${fmtShort(e.endDate)})`; },
+      label: ctx  => `  ${ctx.dataset.label}: ${fmtUSDC(ctx.raw)}`
+    })
+  });
+}
+
+/* ─── Weekly Volume chart ─── */
+function renderWeeklyVolChart(weeks) {
+  if (weeklyVolChartObj) weeklyVolChartObj.destroy();
+  if (!weeks.length) { $('weeklyVolWrap').classList.add('hidden'); $('noWeeklyVolMsg').classList.remove('hidden'); return; }
+  $('weeklyVolWrap').classList.remove('hidden'); $('noWeeklyVolMsg').classList.add('hidden');
+  $('weeklyVolLabel').textContent = `${weeks.length} active week${weeks.length!==1?'s':''}`;
+  weeklyVolChartObj = new Chart($('weeklyVolChart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: weeks.map(w=>fmtShort(w.startDate)),
+      datasets:[{ label:'Volume', data:weeks.map(w=>+w.vol.toFixed(2)),
+        backgroundColor:'rgba(139,92,246,.65)', borderColor:'rgba(139,92,246,.95)', borderWidth:1, borderRadius:4 }]
+    },
+    options: chartOpts({
+      title: items => `Week of ${fmtShort(weeks[items[0].dataIndex].startDate)}`,
+      label: ctx   => [`  Vol: ${fmtUSDC(ctx.raw)}`, `  Trades: ${weeks[ctx.dataIndex].count}`]
+    })
+  });
+}
+
+/* ─── Epoch table ─── */
+function renderEpochTable(epochs) {
+  if (!epochs.length) { $('epochSection').classList.add('hidden'); return; }
+  $('epochSection').classList.remove('hidden');
+  $('epochCount').textContent = `${epochs.length} epoch${epochs.length>1?'s':''}`;
+  const now = new Date(), tbody = $('epochTableBody');
+  tbody.innerHTML = '';
+  [...epochs].reverse().forEach(e => {
+    const isCurrent = e.startDate<=now && e.endDate>=now;
+    const tr = document.createElement('tr');
+    tr.className = 'tr-hover border-b divider transition-colors';
+    tr.innerHTML = `
+      <td class="td-cell">
+        <span class="mono font-semibold text-sky-400 text-xs sm:text-sm">Ep.${e.epochNum}</span>
+        ${isCurrent?'<span class="ml-1 text-xs tag-live px-1 py-0.5 rounded">Live</span>':''}
+      </td>
+      <td class="td-cell text-gray-500 text-xs whitespace-nowrap">${fmtShortYear(e.startDate)} – ${fmtShortYear(e.endDate)}</td>
+      <td class="td-cell text-right ${e.rewards>0?'text-white':'text-gray-700'}">${e.rewards>0?fmtUSDC(e.rewards):'—'}</td>
+      <td class="td-cell text-right ${e.rebates>0?'text-indigo-300':'text-gray-700'}">${e.rebates>0?fmtUSDC(e.rebates):'—'}</td>
+      <td class="td-cell text-right font-semibold text-green-400">${fmtUSDC(e.total)}</td>
+      <td class="td-cell text-right text-gray-600 mono">${e.txns}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ─── Main handler ─── */
+async function handleFetch() {
+  const address = $('walletInput').value.trim();
+  if (!address) { $('walletInput').focus(); return; }
+  if (!isAddr(address)) {
+    showState('errorState');
+    $('errorMsg').textContent = 'Invalid address. Please enter a valid Ethereum address (0x…).';
+    return;
+  }
+  const btn = $('fetchBtn');
+  btn.disabled = true;
+  showState('loadingState');
+  try {
+    $('loadingMsg').textContent    = 'Fetching wallet activity…';
+    $('loadingDetail').textContent = 'Trades · Rewards · Redeems · Yield · Conversions';
+
+    const [trades, rewards, rebates, redeems, yields, conversions] = await Promise.all([
+      fetchAll(address,'TRADE'), fetchAll(address,'REWARD'), fetchAll(address,'MAKER_REBATE'),
+      fetchAll(address,'REDEEM'), fetchAll(address,'YIELD'), fetchAll(address,'CONVERSION'),
+    ]);
+
+    $('loadingDetail').textContent = 'Fetching positions, value & leaderboard ranks…';
+    const [positionValue, positions, lbData] = await Promise.all([
+      fetchValue(address), fetchPositions(address), fetchLeaderboardRank(address),
+    ]);
+
+    const allActivity = [...trades,...rewards,...rebates,...redeems,...yields,...conversions];
+    if (!allActivity.length) { showState('emptyState'); return; }
+
+    /* ── metrics ── */
+    const buySpent       = sum(trades.filter(t=>t.side==='BUY'),  'usdcSize');
+    const sellReceived   = sum(trades.filter(t=>t.side==='SELL'), 'usdcSize');
+    const redeemReceived = sum(redeems, 'usdcSize');
+    const volumeTraded   = sum(trades,  'usdcSize');
+    const marketsTraded  = new Set(trades.map(t=>t.conditionId).filter(Boolean)).size;
+    const totalRewards   = sum(rewards, 'usdcSize');
+    const totalRebates   = sum(rebates, 'usdcSize');
+    const realizedPnL    = sellReceived + redeemReceived - buySpent;
+    const totalPnL       = realizedPnL + positionValue;
+    const avgTradeSize   = trades.length > 0 ? volumeTraded / trades.length : 0;
+
+    const buyConditions    = new Set(trades.filter(t=>t.side==='BUY').map(t=>t.conditionId).filter(Boolean));
+    const redeemConditions = new Set(redeems.map(r=>r.conditionId).filter(Boolean));
+    const openConditions   = new Set(positions.map(p=>p.conditionId).filter(Boolean));
+    let wins=0, losses=0;
+    buyConditions.forEach(cid => {
+      if (redeemConditions.has(cid))     wins++;
+      else if (!openConditions.has(cid)) losses++;
+    });
+    const totalClosed = wins+losses;
+    const winRate = totalClosed>0 ? (wins/totalClosed*100) : null;
+
+    const timestamps  = allActivity.map(a=>a.timestamp).filter(Boolean);
+    const activeSince = new Date(Math.min(...timestamps)*1000);
+    const activeDays  = new Set(allActivity.map(a=>{
+      const d=new Date(a.timestamp*1000);
+      return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+    })).size;
+
+    const epochs     = groupEpochs(rewards, rebates);
+    const weeklyVols = groupWeeklyVolume(trades);
+
+    /* ── DOM ── */
+    $('avatar').textContent             = address.slice(2,4).toUpperCase();
+    $('addrDisplay').textContent        = shortAddr(address);
+    $('activeSinceDisplay').textContent = fmtDate(activeSince);
+    $('updatedAt').textContent          = new Date().toLocaleTimeString();
+    $('polygonscanLink').href           = `https://polygonscan.com/address/${address}`;
+    if (rewards.length && rewards[0].name) {
+      $('profileName').textContent = rewards[0].name;
+      $('profileName').classList.remove('hidden');
+    }
+
+    // Leaderboard — set on both mobile & desktop elements
+    const volTxt = fmtUSDC(volumeTraded);
+    $('leaderboardVolume').textContent  = volTxt;
+    $('leaderboardVolumeD').textContent = volTxt;
+    setRank('leaderboardRank','leaderboardRankD', lbData.volRank);
+    setRank('leaderboardPnlRank','leaderboardPnlRankD', lbData.pnlRank);
+    // Vol rank percentage
+    if (lbData.volRank && lbData.totalTraders) {
+      const pct = lbData.volRank / lbData.totalTraders * 100;
+      const pctTxt = fmtTopPct(pct);
+      const cls = `text-xs mt-0.5 font-semibold ${pctClass(pct)}`;
+      $('leaderboardVolPct').textContent  = pctTxt; $('leaderboardVolPct').className  = cls;
+      $('leaderboardVolPctD').textContent = pctTxt; $('leaderboardVolPctD').className = cls;
+    }
+    // Trading overview
+    $('statPositionValue').textContent = fmtUSDC(positionValue);
+    const pnlEl = $('statPnl');
+    pnlEl.textContent = (totalPnL>=0?'+':'-') + fmtUSDC(Math.abs(totalPnL));
+    pnlEl.className   = 'stat-val ' + (totalPnL>=0?'text-green-400':'text-red-400');
+    $('statPnlNote').textContent  = `${totalPnL>=0?'Profit':'Loss'} (sells+redeems−buys)`;
+    $('statVolume').textContent   = fmtUSDC(volumeTraded);
+    $('statMarkets').textContent  = marketsTraded.toLocaleString();
+    $('statAvgTrade').textContent = fmtUSDC(avgTradeSize);
+
+    const wrEl = $('statWinRate');
+    if (winRate !== null) {
+      wrEl.textContent  = winRate.toFixed(1)+'%';
+      wrEl.className    = 'stat-val '+(winRate>=55?'text-green-400':winRate>=45?'text-yellow-400':'text-red-400');
+      $('statWinRateNote').textContent = `${wins}W · ${losses}L of ${totalClosed} closed`;
+    } else {
+      wrEl.textContent  = '—';
+      wrEl.className    = 'stat-val text-gray-600';
+      $('statWinRateNote').textContent = 'No closed positions';
+    }
+
+    // Wallet history
+    $('statActiveSince').textContent = fmtDate(activeSince);
+    $('statActiveAge').textContent   = timeAgo(activeSince);
+    $('statActiveDays').textContent  = activeDays.toLocaleString();
+
+    // LP rewards
+    $('statLpRewards').textContent = fmtUSDC(totalRewards);
+    $('statRebates').textContent   = fmtUSDC(totalRebates);
+    $('statLpTotal').textContent   = fmtUSDC(totalRewards+totalRebates);
+    $('statEpochs').textContent    = epochs.length;
+    if (epochs.length) {
+      $('epochRangeLabel').textContent =
+        `Epoch 1–${epochs.length} · ${fmtDate(epochs[0].startDate)} to ${fmtDate(epochs[epochs.length-1].endDate)}`;
+    }
+    updateLpTier(totalRewards + totalRebates);
+
+    saveRecentWallet(address);
+
+    showState('results');
+    requestAnimationFrame(() => {
+      renderWeeklyVolChart(weeklyVols);
+      renderChart(epochs);
+      renderEpochTable(epochs);
+    });
+
+  } catch (err) {
+    showState('errorState');
+    $('errorMsg').textContent = err.message.includes('fetch')
+      ? 'Network error. Ensure this page is served over HTTP and the Polymarket API is reachable.'
+      : err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('walletInput').addEventListener('keydown', e => { if(e.key==='Enter') handleFetch(); });
+renderRecentWallets();
+</script>
+</body>
+</html>
