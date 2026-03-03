@@ -282,17 +282,30 @@
     </div>
 
     <!-- Nav -->
-    <a href="https://polymarket.com/leaderboard" target="_blank"
-       class="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-xl transition-all"
-       style="color:var(--text-3);border:1px solid var(--border)"
-       onmouseover="this.style.color='var(--text-1)';this.style.borderColor='var(--border-hov)'"
-       onmouseout="this.style.color='var(--text-3)';this.style.borderColor='var(--border)'">
-      Leaderboard
-      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-        <path d="M2.5 2.5h7m0 0v7m0-7L2.5 9.5" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </a>
+    <div class="flex items-center gap-2">
+      <a href="https://polymarket.com/leaderboard" target="_blank"
+         class="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-xl transition-all"
+         style="color:var(--text-3);border:1px solid var(--border)"
+         onmouseover="this.style.color='var(--text-1)';this.style.borderColor='var(--border-hov)'"
+         onmouseout="this.style.color='var(--text-3)';this.style.borderColor='var(--border)'">
+        Leaderboard
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+          <path d="M2.5 2.5h7m0 0v7m0-7L2.5 9.5" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a href="https://polymarket.com" target="_blank"
+         class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all"
+         style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 2px 12px rgba(16,185,129,.35)"
+         onmouseover="this.style.boxShadow='0 4px 20px rgba(16,185,129,.55)';this.style.transform='translateY(-1px)'"
+         onmouseout="this.style.boxShadow='0 2px 12px rgba(16,185,129,.35)';this.style.transform='translateY(0)'">
+        Trade
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+          <path d="M2.5 2.5h7m0 0v7m0-7L2.5 9.5" stroke="white" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
 
   </div>
 </header>
